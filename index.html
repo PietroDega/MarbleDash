@@ -641,10 +641,11 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
       } else {
         const code = hashCode;
         // no code, or a code that finds no game: ask for it on the page, then start again with it
-        const askCode = (msg) => {
+        const askCode = (msg, keep) => {
           const f = document.getElementById('code-form'); if (!f || !f.hidden) return;
           if (msg) document.getElementById('code-msg').textContent = msg;
-          f.hidden = false; const inp = document.getElementById('code-in'); inp.value = ''; setTimeout(() => inp.focus(), 50);
+          f.hidden = false; const inp = document.getElementById('code-in'); inp.value = keep || '';
+          f.querySelector('button').textContent = keep ? 'Try again' : 'Join'; setTimeout(() => inp.focus(), 50);
           document.getElementById('code-f').onsubmit = (e) => {
             e.preventDefault(); const v = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
             if (v.length < 4) return;
@@ -652,8 +653,13 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
           };
         };
         if (!code) { askCode(); return; }
-        const startedAt = performance.now();
-        setTimeout(() => { if (!conn || !conn.open) askCode('No game found with the code ' + code + '. Check the code on the big screen.'); }, 12000);
+        const startedAt = performance.now(); let unknown = false;
+        // the game was found but the link to it never opened: usually mobile data blocking phone-to-screen links
+        setTimeout(() => {
+          if (conn && conn.open) return;
+          if (unknown) return askCode('No game found with the code ' + code + '. Check the code on the big screen.');
+          askCode('Found the game, but this phone can\u2019t reach it. Mobile data often blocks this: join the same Wi-Fi as the big screen, then try again.', code);
+        }, 12000);
         const peer = new Peer(); let conn = null, others = [], tried = 0;
         emit = () => { if (cb) cb({ peers: others.map((o) => ({ peer: o.peer, kind: 'viewer', sameTab: o.peer === myId, presence: o.peer === myId ? mine : o.presence || {} })) }); };
         push = (patch) => { if (conn && conn.open) { try { conn.send({ t: 'p', p: patch }); } catch (e) {} } };
@@ -667,7 +673,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
           c.on('close', () => { if (c === conn) { others = []; emit(); } });
         };
         peer.on('open', (id) => { myId = id; finish(api); link(); });
-        peer.on('error', (er) => { if (er && er.type === 'peer-unavailable' && performance.now() - startedAt > 5000) askCode('No game found with the code ' + code + '. Check the code on the big screen.'); if (!myId) finish(null); else if (!conn || !conn.open) { others = []; emit(); } });
+        peer.on('error', (er) => { if (er && er.type === 'peer-unavailable') unknown = true; if (er && er.type === 'peer-unavailable' && performance.now() - startedAt > 5000) askCode('No game found with the code ' + code + '. Check the code on the big screen.'); if (!myId) finish(null); else if (!conn || !conn.open) { others = []; emit(); } });
         peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
         setInterval(() => { if (!myId) return; if (!conn || !conn.open) link(); else push({ hb: Math.floor(performance.now() / 1500) % 1000 }); }, 1500);
       }
