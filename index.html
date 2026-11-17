@@ -359,6 +359,29 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
 .code-form p { margin: 0; font: 400 19px "Gochi Hand", Sora, cursive; color: #4a3f5c; }
 .code-form input { font: 400 34px "Lilita One", Sora, system-ui, sans-serif; letter-spacing: 0.25em; text-align: center; text-transform: uppercase; width: 6.5em; padding: 0.15em 0.3em; border: 0; border-radius: 14px; box-shadow: 0 0 0 3px #2e2338; background: #fff; color: #2e2338; }
 .code-form button { font: 400 24px "Lilita One", Sora, system-ui, sans-serif; background: #fc5442; color: #fff7dc; border: 0; border-radius: 999px; padding: 0.35em 1.4em; box-shadow: 0 0 0 3px #2e2338, 0 5px 0 3px #2e2338; }
+.hints { position: fixed; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none; }
+.hints[hidden] { display: none; }
+.hcard { position: relative; isolation: isolate; max-width: min(760px, 88vw); padding: 3.4vmin 4.6vmin; display: grid; gap: 1.4vmin; justify-items: center; text-align: center; rotate: -1.2deg; }
+.hcard::before { content: ""; position: absolute; inset: 0; z-index: -1; background: #fdf8ec; border-radius: 0.6vmin; box-shadow: inset 0 0 0 0.5vmin rgba(232, 214, 180, 0.7); filter: url(#rag-paper) drop-shadow(0 1.2vmin 1.6vmin rgba(74, 63, 92, 0.35)); }
+.hcard h2 { margin: 0; font: 400 clamp(30px, 6.4vmin, 76px) "Lilita One", Sora, system-ui, sans-serif; color: #f6f1c7; -webkit-text-stroke: 0.075em #4a3f5c; paint-order: stroke fill; text-shadow: 0 0.07em 0 #e7634d; line-height: 1.05; }
+.hcard .hsub { margin: 0; font: 400 clamp(17px, 3vmin, 34px) "Gochi Hand", Sora, cursive; color: #4a3f5c; }
+.hcard .hrow { margin: 0; display: flex; align-items: center; gap: 1.6vmin; font: 400 clamp(17px, 3vmin, 34px) "Gochi Hand", Sora, cursive; color: #2e2338; text-align: left; }
+.hic { flex: none; width: 5.2vmin; height: 5.2vmin; border-radius: 50%; box-shadow: 0 0 0 0.4vmin #2e2338; }
+.hic[hidden] { display: none; }
+.h-water { background: radial-gradient(circle at 40% 35%, #a6e6ec, #4db6dd 60%, #3a97c9); }
+.h-power { background: conic-gradient(#9fdcf8 0 12.5%, #8fe0a0 0 25%, #9fdcf8 0 37.5%, #8fe0a0 0 50%, #9fdcf8 0 62.5%, #8fe0a0 0 75%, #9fdcf8 0 87.5%, #8fe0a0 0); animation: act-spin 2.4s linear infinite; }
+.hints.in .hcard { animation: hint-in 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+.hints.out .hcard { animation: hint-out 0.5s cubic-bezier(0.5, 0, 0.75, 0) both; }
+@keyframes hint-in { from { transform: translateY(40vh) rotate(8deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes hint-out { to { transform: translateY(-40vh) rotate(-6deg); opacity: 0; } }
+/* phone lobby: once ready, a back button top left, and the marble to play with */
+.l-back { position: fixed; top: max(14px, env(safe-area-inset-top, 0px)); left: max(14px, env(safe-area-inset-left, 0px)); z-index: 5; font: 400 20px "Lilita One", Sora, system-ui, sans-serif; color: #2e2338; background: #fff7dc; border: 0; border-radius: 999px; padding: 0.35em 1em 0.45em; box-shadow: 0 0 0 3px #2e2338, 0 5px 0 3px #2e2338; }
+.l-back[hidden] { display: none; }
+#l-marble.ready { --w: 52vmin !important; width: 52vmin !important; cursor: pointer; pointer-events: auto; touch-action: manipulation; }
+#l-marble.p-hop { animation: act-hop 0.7s cubic-bezier(0.3, 0, 0.5, 1) !important; }
+#l-marble.p-spin { animation: act-spin 0.9s cubic-bezier(0.45, 0, 0.55, 1) !important; }
+#l-marble.p-wiggle { animation: act-wiggle 0.6s ease-in-out !important; }
+#l-marble.p-squish { animation: act-squish 0.5s ease-out !important; }
 .room-bots { display: flex; flex-wrap: wrap; gap: 1.6vmin 2.4vmin; justify-content: center; max-width: 92vw; }
 #room-bot { background: #ffe9a8; } #room-unbot { background: #f3e1e6; }
 .room-count { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; font-family: "Lilita One", "Sora", system-ui, sans-serif; font-size: 46vmin; color: #f6f1c7; -webkit-text-stroke: 0.05em #4a3f5c; paint-order: stroke fill; text-shadow: 0 0.05em 0 #e7634d; background: rgba(74, 63, 92, 0.25); }
@@ -383,7 +406,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
   transition: transform 0.15s;
 }
 .swatch .pball { position: absolute; left: 7px; top: 4px; width: 74px; height: 74px; pointer-events: none; }
-#l-marble { background: center / contain no-repeat !important; box-shadow: none !important; animation: none !important; }
+#l-marble { background-color: transparent !important; background-position: center !important; background-size: contain !important; background-repeat: no-repeat !important; box-shadow: none !important; animation: none !important; }
 #l-marble::before, #l-marble::after { display: none !important; }
 .swatch .mball { --w: 70px; position: absolute; left: 9px; top: 6px; filter: url(#wc); animation: none; box-shadow: none; }
 .swatch[aria-pressed="true"] { transform: scale(1.12); }
@@ -474,6 +497,12 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
 </div>
 <div class="callout" id="callout" aria-live="polite" hidden></div>
 <canvas id="wave" class="wave" hidden></canvas>
+<div class="hints" id="hints" hidden><div class="hcard">
+  <h2 id="h-goal">Race to the finish line first!</h2>
+  <p class="hsub" id="h-sub"></p>
+  <p class="hrow"><i class="hic h-water"></i><span id="h-water"></span></p>
+  <p class="hrow"><i class="hic h-power" id="h-power-ic"></i><span id="h-power"></span></p>
+</div></div>
 <div class="code-form" id="code-form" hidden><form id="code-f" autocomplete="off"><h2>Join the game</h2><p id="code-msg">Type the room code shown on the big screen.</p><input id="code-in" maxlength="5" inputmode="text" autocapitalize="characters" spellcheck="false" aria-label="Room code"><button type="submit">Join</button></form></div>
 <div class="result" id="result" hidden><div class="rpaper" id="rpaper"></div><div class="rrows" id="rrows"></div><div class="rtitle" id="rtitle"></div><canvas id="rfx"></canvas></div>
 
@@ -486,6 +515,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
     <button class="start" id="l-start" type="button" aria-pressed="false" disabled>Ready</button>
     <p id="l-note"></p>
   </div>
+  <button class="l-back" id="l-back" type="button" hidden>&lsaquo; Back</button>
 </div>
 
 <svg class="wc-defs" aria-hidden="true"><defs>
@@ -727,11 +757,26 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
   let decor = [], halfW, spacing = 3, necks = [], feats = [], islands = [], hzField, wallH, gridLoop = [], zoneField, posts = [], zones = [], props = [], movers = [], geysers = [], rocks = [], bridge = null, wheel = null, cannon = null;
   let raceStartAt = 0, countShown = 9, solo = false, lobbyGoAt = 0, lobbyShown = 9, revealAt = 0;
   const REVEAL_HOLD = 1300, REVEAL = 2000, ZOOM_IN = 3000;   // the hold covers the wave that clears the lobby
+  let revealExtra = 0; const hintsShown = { race: false, arena: false };
+  function showHints() {
+    const el = $('hints'), ar = arenaOn();
+    $('h-goal').textContent = ar ? 'Hit the others!' : 'Race to the finish line first!';
+    $('h-sub').textContent = ar ? 'Take turns. Three hits and a marble is out: the last one standing wins.' : 'First across the line scores 1 point, second scores half. 3 points take the game.';
+    $('h-water').textContent = ar ? 'Blue water is a trap: fall in and you lose a life.' : 'Blue water is a trap: fall in and you go back.';
+    $('h-power').textContent = ar ? 'Your aim is hidden: watch the shooter shake as it pulls.' : 'Roll over the striped balls to grab a power-up.';
+    $('h-power-ic').hidden = ar;
+    el.hidden = false; el.classList.remove('out'); void el.offsetWidth; el.classList.add('in');
+    clearTimeout(el.tm); el.tm = setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.hidden = true; }, 500); }, REVEAL_HOLD + REVEAL + revealExtra - 700);
+  }
   // Before each race the whole track is shown from above for a while, then the camera zooms slowly in on
   // the marbles; 3, 2, 1 is counted during the zoom and Go comes as it arrives.
   let washMid = 0;   // when the wave fully covers the screen: the lobby is taken away then
   function beginReveal() {
-    revealAt = performance.now(); raceStartAt = revealAt + REVEAL_HOLD + REVEAL + ZOOM_IN; countShown = 9;
+    revealAt = performance.now();
+    // the first race of each mode in a session: the track is held longer, with a card saying the goal and the dangers
+    revealExtra = 0;
+    if (role === 'screen' && !hintsShown[gameMode]) { hintsShown[gameMode] = true; revealExtra = 5500; showHints(); }
+    raceStartAt = revealAt + REVEAL_HOLD + REVEAL + revealExtra + ZOOM_IN; countShown = 9;
     if (role !== 'screen') return;
     if (!waveBusy()) waveWipe(null, true);
     washMid = CALM ? 0 : waveStart + WAVE_COVER;
@@ -836,7 +881,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
     x.lineWidth = 3; x.strokeStyle = 'rgba(120,190,215,0.6)'; x.stroke();
   }
   let revealTest = null;   // test hook: hold the reveal at a fixed point
-  const revealing = () => revealTest !== null || ((!lobby || solo) && revealAt && performance.now() < revealAt + REVEAL_HOLD + REVEAL);
+  const revealing = () => revealTest !== null || ((!lobby || solo) && revealAt && performance.now() < revealAt + REVEAL_HOLD + REVEAL + revealExtra);
   const zoomingIn = () => (!lobby || solo) && revealAt && !revealing() && performance.now() < raceStartAt;
   // Lobby: phones pick a colour and press Start; the race begins once every phone has.
   // Impact feedback is made of the beach itself: marbles squash, sand is thrown and falls
@@ -2002,6 +2047,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
       } else if (lobby && mb.ci !== c && free) { wins[c] = wins[mb.ci]; wins[mb.ci] = 0; mb.ci = c; }
       mb.go = went(p);
       mb.steer = [clamp1(pr.sx), clamp1(pr.sy)];
+      if (typeof pr.pk === 'number' && pr.pk !== mb.pk) { if (mb.pk !== undefined) seatPoke(mb.ci, pr.pm); mb.pk = pr.pk; }
       mb.aim = mb.state === 'ready' && !lobby ? [clamp1(pr.ax), clamp1(pr.ay)] : [0, 0];
       if (k !== mb.seq) {
         mb.seq = k;
@@ -3673,7 +3719,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
       }
       if (arenaOn()) tb = f;   // the arena is always seen whole
       if (zoomingIn()) {   // slowly in from the whole track: slow start, faster, settling on the marbles at Go
-        const u = easeIO((performance.now() - revealAt - REVEAL_HOLD - REVEAL) / ZOOM_IN);
+        const u = easeIO((performance.now() - revealAt - REVEAL_HOLD - REVEAL - revealExtra) / ZOOM_IN);
         for (let i = 0; i < 4; i++) cam.box[i] = f[i] + (tb[i] - f[i]) * u;
       } else {
         const k = Math.min(1, dt * 1.5);
@@ -4173,6 +4219,22 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
     try { if (navigator.vibrate) navigator.vibrate(20); } catch (e) {}
     lobbyUi();
   });
+  // Back: not ready any more, pick again
+  $('l-back').addEventListener('click', () => {
+    if (!pad.go) return; pad.auto = false; pad.go = 0;
+    if (room) room.presence({ go: 0 }).catch(() => {});
+    try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
+    lobbyUi();
+  });
+  // while waiting, tap your marble: it does a trick here and on the big screen
+  let pokeN = 0;
+  $('l-marble').addEventListener('click', () => {
+    if (!pad.go) return;
+    const lm = $('l-marble'), mv = ['hop', 'spin', 'wiggle', 'squish'][Math.floor(Math.random() * 4)];
+    lm.classList.remove('p-hop', 'p-spin', 'p-wiggle', 'p-squish'); void lm.offsetWidth; lm.classList.add('p-' + mv);
+    try { if (navigator.vibrate) navigator.vibrate(mv === 'spin' ? [10, 40, 10] : 12); } catch (e) {}
+    pokeN++; if (room) room.presence({ pk: pokeN, pm: mv }).catch(() => {});
+  });
   function lobbyUi() {
     const show = role === 'pad' && pad.linked && !pad.inRace;
     const sens = tilt.on && tilt.seen, drv = pad.mode === 'drive';
@@ -4186,19 +4248,19 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
       b.disabled = pad.taken.includes(i) || (!!pad.go && i !== pad.want);
       b.setAttribute('aria-pressed', String(i === pad.want && !pad.taken.includes(i)));
     });
-    lTitle.textContent = pad.go ? 'You are ' + NAMES[pad.want] : 'Pick your marble';
+    lTitle.textContent = pad.go ? 'You\u2019re in!' : 'Pick your marble';
     lStart.disabled = !mine;
     lStart.setAttribute('aria-pressed', String(!!pad.go));
-    lStart.textContent = pad.go ? 'Ready!' : 'Ready';
-    const lm = $('l-marble'); lm.hidden = pad.want < 0;
+    lStart.textContent = 'Ready'; lStart.hidden = !!pad.go; $('l-back').hidden = !pad.go; lSw.hidden = !!pad.go;
+    const lm = $('l-marble'); lm.hidden = pad.want < 0; lm.classList.toggle('ready', !!pad.go);
     if (pad.want >= 0) lm.style.backgroundImage = 'url(ui/marble-' + pad.want + '.png)';
     lNote.textContent = pad.full ? 'The race already has 6 players.'
       : pad.want >= 0 && pad.taken.includes(pad.want) ? 'Someone took that colour. Pick another.'
       : pad.go && drv && sens ? pad.nGo + ' of ' + pad.nPads + ' phones flat. Leave it on the table until Go, then pick it up and tilt to drive.'
-      : pad.go ? pad.nGo + ' of ' + pad.nPads + ' ready. Waiting for the others. Tap Ready to change your mind.'
+      : pad.go ? 'Tap your marble while you wait! ' + pad.nGo + ' of ' + pad.nPads + ' ready.'
       : mine && drv && sens ? 'Lay the phone flat on the table. The countdown starts when every phone is flat.'
       : mine && drv ? 'This phone cannot read its motion sensor here. Press Ready, then drag a thumb to drive.'
-      : mine ? 'Press Start when you are ready. The race begins once everyone has.'
+      : mine ? 'Press Ready. The race begins once everyone is.'
       : 'Tap a colour that is still free.';
   }
   let steerSent = 0;
@@ -4496,6 +4558,15 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
     newRace(); syncPads(); publishState(true); roomUi();
   }));
   let seatActs = [];
+  function seatPlay(a, mv) {
+    a.el.classList.remove('hop', 'wiggle', 'look', 'spin', 'squish'); void a.el.offsetWidth; a.el.classList.add(mv);
+    if (mv === 'hop' || mv === 'spin') { a.img.src = seatSprites.wows[a.ci]; setTimeout(() => { a.img.src = seatSprites.balls[a.ci]; }, 600); }
+  }
+  function seatPoke(ci, mv) {
+    if (!['hop', 'spin', 'wiggle', 'squish'].includes(mv)) return;
+    const a = seatActs.find((x) => x.ci === ci); if (!a || !seatSprites) return;
+    seatPlay(a, mv); a.next = performance.now() + 2500; snd('pick');
+  }
   function seatTick(now) {
     if (!seatSprites || roomEl.hidden) return;
     for (const a of seatActs) {
@@ -4506,9 +4577,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
       }
       if (now > a.next && !CALM) {
         const moves = a.go ? ['hop', 'spin', 'wiggle', 'squish', 'hop'] : ['look', 'wiggle', 'squish', 'hop', 'look'];
-        const mv = moves[Math.floor(Math.random() * moves.length)];
-        a.el.classList.remove('hop', 'wiggle', 'look', 'spin', 'squish'); void a.el.offsetWidth; a.el.classList.add(mv);
-        if (mv === 'hop' || mv === 'spin') { a.img.src = seatSprites.wows[a.ci]; setTimeout(() => { a.img.src = seatSprites.balls[a.ci]; }, 600); }
+        seatPlay(a, moves[Math.floor(Math.random() * moves.length)]);
         a.next = now + (a.go ? 1800 : 2800) + Math.random() * 4000;
       }
     }
