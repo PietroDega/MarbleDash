@@ -340,6 +340,8 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
 #room-note, #room-status { display: none; }   /* "Scan to join" is enough, and no status line */
 .room-modes button { font-size: clamp(18px, 3vmin, 34px) !important; opacity: 0.6; }
 .room-modes button[aria-pressed="true"] { opacity: 1; background: #fc5442 !important; color: #fff7dc !important; rotate: -2deg; }
+.room-sep { width: 3vmin; }
+.room-modes button:disabled { opacity: 0.25 !important; cursor: default; }
 .room-bots { display: flex; flex-wrap: wrap; gap: 1.6vmin 2.4vmin; justify-content: center; max-width: 92vw; }
 #room-bot { background: #ffe9a8; } #room-unbot { background: #f3e1e6; }
 .room-count { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; font-family: "Lilita One", "Sora", system-ui, sans-serif; font-size: 46vmin; color: #f6f1c7; -webkit-text-stroke: 0.05em #4a3f5c; paint-order: stroke fill; text-shadow: 0 0.05em 0 #e7634d; background: rgba(74, 63, 92, 0.25); }
@@ -363,6 +365,9 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
   background: radial-gradient(ellipse 60% 22% at 54% 88%, rgba(185, 138, 82, 0.35), transparent 70%); box-shadow: none;
   transition: transform 0.15s;
 }
+.swatch .pball { position: absolute; left: 7px; top: 4px; width: 74px; height: 74px; pointer-events: none; }
+#l-marble { background: center / contain no-repeat !important; box-shadow: none !important; animation: none !important; }
+#l-marble::before, #l-marble::after { display: none !important; }
 .swatch .mball { --w: 70px; position: absolute; left: 9px; top: 6px; filter: url(#wc); animation: none; box-shadow: none; }
 .swatch[aria-pressed="true"] { transform: scale(1.12); }
 .swatch[aria-pressed="true"] .mball { animation: room-hop 0.6s cubic-bezier(0.3, 0, 0.6, 1) infinite alternate; }
@@ -408,7 +413,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
         <p class="room-status" id="room-status"></p>
       </div>
     </div>
-    <div class="room-bots room-modes"><button class="room-solo" id="gm-race" type="button" aria-pressed="true">Race</button><button class="room-solo" id="gm-arena" type="button" aria-pressed="false">Arena</button></div>
+    <div class="room-bots room-modes"><button class="room-solo" id="gm-race" type="button" aria-pressed="true">Race</button><button class="room-solo" id="gm-arena" type="button" aria-pressed="false">Arena</button><span class="room-sep"></span><button class="room-solo" id="ctl-sling" type="button" aria-pressed="true">Slingshot</button><button class="room-solo" id="ctl-tilt" type="button" aria-pressed="false">Tilt</button></div>
     <div class="room-bots"><button class="room-solo" id="room-solo" type="button">Practise with the mouse</button><button class="room-solo" id="room-bot" type="button">Add a bot</button><button class="room-solo" id="room-unbot" type="button">Remove bots</button><button class="room-solo" id="room-pad" type="button">Use as a controller</button></div>
   </div>
   <div class="room-count" id="room-count" hidden></div>
@@ -2475,6 +2480,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
     if (m === 'drive' && arenaOn()) m = 'sling';   // the arena is played with the slingshot
     mode = m;
     $('b-mode').textContent = m === 'drive' ? 'Mode: Tilt drive' : 'Mode: Slingshot';
+    $('ctl-sling').setAttribute('aria-pressed', String(m !== 'drive')); $('ctl-tilt').setAttribute('aria-pressed', String(m === 'drive'));
     if (padCount) openLobby();
     newRace(); joinVisible(); refreshStatus();
   }
@@ -3517,7 +3523,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
     }
     if (!R0.leaving && t >= (R0.game !== null ? 4600 : 3300)) {
       R0.leaving = true; const g = R0.game !== null;
-      waveWipe(() => { endResult(); if (g) { wins.fill(0); if (padCount) openLobby(); } newRace(); }, !g);
+      waveWipe(() => { endResult(); if (g) { wins.fill(0); solo = false; openLobby(); joinVisible(); } newRace(); roomUi(); }, !g);   // a won game ends in the lobby
     }
   }
   // the names beside the rows (page text over the picture, like the comic lettering)
@@ -3851,10 +3857,11 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
   // The lobby's seats are pictures made by the same renderer and watercolour pass as the race: each
   // marble with its own eyes, and the dish it sits in, drawn once on paper and cut out from the paper.
   let seatSprites = null;
-  function makeSeatSprites(t) {
-    seatSprites = { dish: null, balls: [] };
+  // solo: just the marbles, at size S0, cropped to the marble (for the phone's pictures); the lobby's seats are left alone
+  function makeSeatSprites(t, S0, solo) {
+    const out = { dish: null, balls: [], blinks: [], wows: [] }; if (!solo) seatSprites = out;
     try {
-      const S = 256, tg = makeTarget(S, S), zb = -2.6 * HS, RB = 9.5, RD = 12;
+      const S = S0 || 256, tg = makeTarget(S, S), zb = -2.6 * HS, RB = 9.5, RD = 12;
       const cm = camFor(EL_LOW, [-17, -23, 17, 11], 1), I3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
       const shoot = (draw) => {
         gl.bindFramebuffer(gl.FRAMEBUFFER, tg.ms); gl.viewport(0, 0, S, S); gl.enable(gl.DEPTH_TEST);
@@ -3877,7 +3884,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
         }
         x.putImageData(id, 0, 0); return c;
       };
-      seatSprites.dish = shoot(() => {
+      out.dish = shoot(() => {
         gl.bindVertexArray(vaoC); gl.uniform1f(US.uMode, 2);
         gl.uniform3f(US.uScale, RD, RD, 1.4); gl.uniform3f(US.uCen, 0, 0, zb - 0.7); gl.uniform3f(US.uCol, 0.74, 0.68, 0.78); gl.uniform3f(US.uCol2, 0.74, 0.68, 0.78);
         gl.drawElements(gl.TRIANGLES, nC, gl.UNSIGNED_INT, 0);
@@ -3890,24 +3897,25 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
         gl.uniform3f(US.uScale, RB, RB, RB); gl.uniform3f(US.uCen, 0, 0, zb + RB * 0.35); gl.uniform3fv(US.uCol, COLORS[ci]);
         gl.drawElements(gl.TRIANGLES, nS, gl.UNSIGNED_INT, 0);
       });
-      seatSprites.blinks = []; seatSprites.wows = [];
+      out.blinks = []; out.wows = [];
       for (let ci = 0; ci < 6; ci++) {
-        seatSprites.balls.push(ballShot(ci, [1.15, 1, 0.7]));
-        seatSprites.blinks.push(ballShot(ci, [1.15, 0.1, 0.7]));   // eyes shut
-        seatSprites.wows.push(ballShot(ci, [1.35, 1.3, -1]));      // a round "oh"
+        out.balls.push(ballShot(ci, [1.15, 1, 0.7]));
+        out.blinks.push(ballShot(ci, [1.15, 0.1, 0.7]));   // eyes shut
+        out.wows.push(ballShot(ci, [1.35, 1.3, -1]));      // a round "oh"
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       // one crop for all of them, round the dish and the tallest marble, so marble and dish still line up
       let x0 = S, y0 = S, x1 = 0, y1 = 0;
-      for (const c of [seatSprites.dish, ...seatSprites.balls]) {
+      for (const c of solo ? out.balls : [out.dish, ...out.balls]) {
         const a = c.getContext('2d').getImageData(0, 0, S, S).data;
         for (let y = 0; y < S; y++) for (let i = 0; i < S; i++) if (a[(y * S + i) * 4 + 3] > 40) { x0 = Math.min(x0, i); x1 = Math.max(x1, i); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
       }
       const side = Math.max(x1 - x0, y1 - y0) + 8, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
       const crop = (c) => { const o = document.createElement('canvas'); o.width = o.height = side; o.getContext('2d').drawImage(c, cx - side / 2, cy - side / 2, side, side, 0, 0, side, side); return o.toDataURL('image/png'); };
-      seatSprites.dish = crop(seatSprites.dish); seatSprites.balls = seatSprites.balls.map(crop); seatSprites.blinks = seatSprites.blinks.map(crop); seatSprites.wows = seatSprites.wows.map(crop);
+      out.dish = crop(out.dish); out.balls = out.balls.map(crop); out.blinks = out.blinks.map(crop); out.wows = out.wows.map(crop);
+      if (solo) return out;
       roomKey = '';   // rebuild the lobby with the painted seats
-    } catch (e) { console.error(e); seatSprites = { dish: null, balls: [] }; }
+    } catch (e) { console.error(e); if (!solo) seatSprites = { dish: null, balls: [] }; }
   }
   function makeTargets() {
     fboW = cv.width; fboH = cv.height;
@@ -4049,14 +4057,24 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
     }
     pctx.closePath();
   }
+  // the marbles as the game paints them (made by the big screen's renderer with the watercolour pass)
+  const PAINTED = [0, 1, 2, 3, 4, 5].map((i) => { const a = new Image(), b = new Image(); a.src = 'ui/marble-' + i + '.png'; b.src = 'ui/marble-' + i + '-blink.png'; return [a, b]; });
   function drawBall(x, y, r, c, alpha, spin) {
     pctx.save();
     pctx.globalAlpha = alpha;
+    const ci = COLORS.indexOf(c), pim = ci >= 0 && PAINTED[ci];
     // a sand-coloured wash on the paper under the marble, and a soft violet shadow
     pctx.fillStyle = 'rgba(242,210,123,0.6)';
     pctx.save(); pctx.translate(x, y + r * 0.18); pctx.scale(1.45, 1.3); wobble(0, 0, r, 0.03); pctx.fill(); pctx.restore();
     pctx.fillStyle = 'rgba(160,140,190,0.3)';
     pctx.save(); pctx.translate(x + r * 0.32, y + r * 0.42); pctx.scale(0.95, 0.8); wobble(0, 0, r, 0.03); pctx.fill(); pctx.restore();
+    if (pim && pim[0].complete && pim[0].naturalWidth) {
+      // the painted marble: it sways a little as it spins and blinks now and then
+      const blink = (performance.now() / 1000 + ci * 1.37) % 3.8 < 0.13 && pim[1].complete && pim[1].naturalWidth, im = blink ? pim[1] : pim[0], size = 2 * r / 0.933;
+      pctx.translate(x, y); pctx.rotate(Math.sin(spin || 0) * 0.12);
+      pctx.drawImage(im, -size / 2, -size / 2, size, size);
+      pctx.restore(); return;
+    }
     const dark = c.map((v, i) => v * [0.80, 0.66, 0.84][i] + [0.03, 0, 0.07][i]);
     const rim = c.map((v, i) => v * [0.62, 0.52, 0.66][i]);
     // body: one flat colour, washed unevenly, lighter up and to the left
@@ -4095,7 +4113,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
   NAMES.forEach((name, i) => {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'swatch'; b.setAttribute('aria-label', name);
-    { const m = document.createElement('div'); m.className = 'mball'; ballStyle(m, i); b.append(m); }
+    { const m = document.createElement('img'); m.className = 'pball'; m.alt = ''; m.src = 'ui/marble-' + i + '.png'; b.append(m); }
     b.addEventListener('click', () => {
       keepAwake();
       if (pad.go) return;
@@ -4136,7 +4154,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
     lStart.setAttribute('aria-pressed', String(!!pad.go));
     lStart.textContent = pad.go ? 'Ready!' : 'Ready';
     const lm = $('l-marble'); lm.hidden = pad.want < 0;
-    if (pad.want >= 0) ballStyle(lm, pad.want);
+    if (pad.want >= 0) lm.style.backgroundImage = 'url(ui/marble-' + pad.want + '.png)';
     lNote.textContent = pad.full ? 'The race already has 6 players.'
       : pad.want >= 0 && pad.taken.includes(pad.want) ? 'Someone took that colour. Pick another.'
       : pad.go && drv && sens ? pad.nGo + ' of ' + pad.nPads + ' phones flat. Leave it on the table until Go, then pick it up and tilt to drive.'
@@ -4382,9 +4400,13 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
     if (gameMode === m) return;
     gameMode = m; if (m === 'arena' && mode === 'drive') setMode('sling');
     $('gm-race').setAttribute('aria-pressed', String(m === 'race')); $('gm-arena').setAttribute('aria-pressed', String(m === 'arena'));
+    $('ctl-tilt').disabled = m === 'arena';
     newRace(); roomKey = ''; roomUi(); publishState(true);
   }
   $('gm-race').addEventListener('click', () => setGameMode('race'));
+  // how the phones control their marbles: pull and let go, or tilt the phone like a tray (the arena is slingshot only)
+  $('ctl-sling').addEventListener('click', () => { if (mode !== 'sling') setMode('sling'); });
+  $('ctl-tilt').addEventListener('click', () => { if (!arenaOn() && mode !== 'drive') setMode('drive'); });
   $('gm-arena').addEventListener('click', () => setGameMode('arena'));
   // Bots, for testing: up to five computer marbles that join the race and play it as best they can
   $('room-bot').addEventListener('click', () => {
@@ -4531,7 +4553,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
   window.addEventListener('pointerdown', () => { if (role === 'screen' || !introEl.hidden) musicInit(); });
   window.addEventListener('keydown', () => { if (!introEl.hidden) musicInit(); });
   $('b-sound').addEventListener('click', (e) => { muted = !muted; audioInit(); e.currentTarget.textContent = muted ? 'Sound off' : 'Sound on'; e.currentTarget.setAttribute('aria-pressed', String(!muted)); });
-  window.__marble = { reveal: (u) => { revealTest = u; }, waveState: () => wave, at: (i) => project(marbles[i].x, marbles[i].y, 0), nudge, burst, dent, ripples, wave: (ci, laps) => { wave = { ci, q: marbles[0].pi | 0, n: 0, laps: laps || 1 }; }, marbles, P, pad, setRole, pebbles: () => pebbles, info: () => trackInfo, newRace, fire: (pw) => kick(marbles[0], 1, 0, pw), cannon: () => cannon, wheel: () => wheel, setTheme: (v) => { themeSel = v; newRace(); }, setLaps: (n) => { LAPS = n; newRace(); }, tunes, setMode, tilt, mode: () => mode, geysers: () => geysers, lobby: () => [lobby, lobbyId, padCount], kick: (i, p) => kick(marbles[i], tanX[q0], tanY[q0], p), clock: () => [Math.round(performance.now()), Math.round(raceStartAt)], arena: () => arena && { phase: arena.phase, shooter: arena.shooter && arena.shooter.ci, hits: marbles.map((m) => [m.ci, m.hits, m.state]) }, setGameMode: (m) => setGameMode(m), arenaTurn: (i, shots) => { if (!arena) return; arena.shooter = marbles[i]; arena.idx = arena.order.indexOf(marbles[i]); arena.phase = 'aim'; arena.t0 = performance.now(); marbles[i].shots = shots; }, arenaInfo: () => arenaInfo && { peaks: arenaInfo.peaks.map((o) => [o[0], o[1], hAt(o[0], o[1])]), pits: arenaInfo.pits.map((o) => [o[0], o[1], hAt(o[0], o[1])]), flat: hAt(arenaInfo.cx, arenaInfo.cy) }, give: (i, k) => { marbles[i].item = k; publishState(false); }, shells: () => shells, crabs: () => crabs, gullState: () => gull && { phase: gull.phase }, machine: () => machine && { kind: machine.kind, phase: machine.phase, open: machine.open, trig: machine.trig, gate: machine.at(-15, machine.oA), gap: machine.at(3, machine.oA), before: machine.at(-30, machine.oA) }, win: (i) => finish(marbles[i || 0]), winHold: (on) => { winTest = !!on; }, winShow: () => winShow && winShow.rect, path: () => [pathX, pathY, q0] };
+  window.__marble = { reveal: (u) => { revealTest = u; }, waveState: () => wave, at: (i) => project(marbles[i].x, marbles[i].y, 0), nudge, burst, dent, ripples, wave: (ci, laps) => { wave = { ci, q: marbles[0].pi | 0, n: 0, laps: laps || 1 }; }, marbles, P, pad, setRole, pebbles: () => pebbles, info: () => trackInfo, newRace, fire: (pw) => kick(marbles[0], 1, 0, pw), cannon: () => cannon, wheel: () => wheel, setTheme: (v) => { themeSel = v; newRace(); }, setLaps: (n) => { LAPS = n; newRace(); }, tunes, setMode, tilt, mode: () => mode, geysers: () => geysers, lobby: () => [lobby, lobbyId, padCount], kick: (i, p) => kick(marbles[i], tanX[q0], tanY[q0], p), clock: () => [Math.round(performance.now()), Math.round(raceStartAt)], arena: () => arena && { phase: arena.phase, shooter: arena.shooter && arena.shooter.ci, hits: marbles.map((m) => [m.ci, m.hits, m.state]) }, setGameMode: (m) => setGameMode(m), paintBalls: (S) => makeSeatSprites(0, S, true), setWins: (ci, v) => { wins[ci] = v; }, arenaTurn: (i, shots) => { if (!arena) return; arena.shooter = marbles[i]; arena.idx = arena.order.indexOf(marbles[i]); arena.phase = 'aim'; arena.t0 = performance.now(); marbles[i].shots = shots; }, arenaInfo: () => arenaInfo && { peaks: arenaInfo.peaks.map((o) => [o[0], o[1], hAt(o[0], o[1])]), pits: arenaInfo.pits.map((o) => [o[0], o[1], hAt(o[0], o[1])]), flat: hAt(arenaInfo.cx, arenaInfo.cy) }, give: (i, k) => { marbles[i].item = k; publishState(false); }, shells: () => shells, crabs: () => crabs, gullState: () => gull && { phase: gull.phase }, machine: () => machine && { kind: machine.kind, phase: machine.phase, open: machine.open, trig: machine.trig, gate: machine.at(-15, machine.oA), gap: machine.at(3, machine.oA), before: machine.at(-30, machine.oA) }, win: (i) => finish(marbles[i || 0]), winHold: (on) => { winTest = !!on; }, winShow: () => winShow && winShow.rect, path: () => [pathX, pathY, q0] };
   // Suggest the likely role: a touch-first narrow device is a controller.
   const likelyPad = window.matchMedia && window.matchMedia('(pointer: coarse)').matches && Math.min(window.innerWidth, window.innerHeight) < 600;
   (likelyPad ? $('c-pad') : $('c-screen')).setAttribute('aria-pressed', 'true');
