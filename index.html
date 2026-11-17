@@ -349,6 +349,16 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
 .room-modes button[aria-pressed="true"] { opacity: 1; background: #fc5442 !important; color: #fff7dc !important; rotate: -2deg; }
 .room-sep { width: 3vmin; }
 .room-modes button:disabled { opacity: 0.25 !important; cursor: default; }
+.room-qr .qr-head { font-size: clamp(15px, 2.4vmin, 26px) !important; max-width: 30vmin; text-align: center; line-height: 1.1; }
+.room-code { font: 400 clamp(18px, 3.4vmin, 40px) "Lilita One", Sora, system-ui, sans-serif; letter-spacing: 0.18em; color: #2e2338; background: #fff7dc; padding: 0.1em 0.5em; border-radius: 0.4em; box-shadow: 0 0 0 0.3vmin #2e2338; }
+/* the phone's room-code box, for when the link did not carry the code */
+.code-form { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(251, 245, 232, 0.97); padding: 24px; box-sizing: border-box; }
+.code-form[hidden] { display: none; }
+.code-form form { display: grid; gap: 14px; justify-items: center; text-align: center; max-width: 340px; }
+.code-form h2 { margin: 0; font: 400 30px "Lilita One", Sora, system-ui, sans-serif; color: #2e2338; }
+.code-form p { margin: 0; font: 400 19px "Gochi Hand", Sora, cursive; color: #4a3f5c; }
+.code-form input { font: 400 34px "Lilita One", Sora, system-ui, sans-serif; letter-spacing: 0.25em; text-align: center; text-transform: uppercase; width: 6.5em; padding: 0.15em 0.3em; border: 0; border-radius: 14px; box-shadow: 0 0 0 3px #2e2338; background: #fff; color: #2e2338; }
+.code-form button { font: 400 24px "Lilita One", Sora, system-ui, sans-serif; background: #fc5442; color: #fff7dc; border: 0; border-radius: 999px; padding: 0.35em 1.4em; box-shadow: 0 0 0 3px #2e2338, 0 5px 0 3px #2e2338; }
 .room-bots { display: flex; flex-wrap: wrap; gap: 1.6vmin 2.4vmin; justify-content: center; max-width: 92vw; }
 #room-bot { background: #ffe9a8; } #room-unbot { background: #f3e1e6; }
 .room-count { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; font-family: "Lilita One", "Sora", system-ui, sans-serif; font-size: 46vmin; color: #f6f1c7; -webkit-text-stroke: 0.05em #4a3f5c; paint-order: stroke fill; text-shadow: 0 0.05em 0 #e7634d; background: rgba(74, 63, 92, 0.25); }
@@ -414,7 +424,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
   <div class="room-in">
     <h2>Marble Dash</h2>
     <div class="room-row">
-      <div class="room-qr" id="room-qr"><canvas id="qr2" width="132" height="132"></canvas><strong>Scan to join</strong><span id="room-note">Pick your marble on the phone, then press Ready.</span></div>
+      <div class="room-qr" id="room-qr"><strong class="qr-head">Use your phone as a controller</strong><canvas id="qr2" width="132" height="132"></canvas><strong>Scan to join</strong><b class="room-code" id="room-code" hidden></b><span id="room-note">Pick your marble on the phone, then press Ready.</span></div>
       <div class="room-side">
         <div class="room-slots" id="room-slots"></div>
         <p class="room-status" id="room-status"></p>
@@ -464,6 +474,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
 </div>
 <div class="callout" id="callout" aria-live="polite" hidden></div>
 <canvas id="wave" class="wave" hidden></canvas>
+<div class="code-form" id="code-form" hidden><form id="code-f" autocomplete="off"><h2>Join the game</h2><p id="code-msg">Type the room code shown on the big screen.</p><input id="code-in" maxlength="5" inputmode="text" autocapitalize="characters" spellcheck="false" aria-label="Room code"><button type="submit">Join</button></form></div>
 <div class="result" id="result" hidden><div class="rpaper" id="rpaper"></div><div class="rrows" id="rrows"></div><div class="rtitle" id="rtitle"></div><canvas id="rfx"></canvas></div>
 
 <div class="lobby" id="lobby" hidden>
@@ -628,8 +639,21 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
           if (gone) emit();
         }, 2000);
       } else {
-        let code = hashCode;
-        if (!code) { try { code = (window.prompt('Room code shown on the big screen') || '').toUpperCase().trim(); } catch (e) {} }
+        const code = hashCode;
+        // no code, or a code that finds no game: ask for it on the page, then start again with it
+        const askCode = (msg) => {
+          const f = document.getElementById('code-form'); if (!f || !f.hidden) return;
+          if (msg) document.getElementById('code-msg').textContent = msg;
+          f.hidden = false; const inp = document.getElementById('code-in'); inp.value = ''; setTimeout(() => inp.focus(), 50);
+          document.getElementById('code-f').onsubmit = (e) => {
+            e.preventDefault(); const v = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (v.length < 4) return;
+            location.replace(location.pathname + '#pad=' + v); location.reload();
+          };
+        };
+        if (!code) { askCode(); return; }
+        const startedAt = performance.now();
+        setTimeout(() => { if (!conn || !conn.open) askCode('No game found with the code ' + code + '. Check the code on the big screen.'); }, 12000);
         const peer = new Peer(); let conn = null, others = [], tried = 0;
         emit = () => { if (cb) cb({ peers: others.map((o) => ({ peer: o.peer, kind: 'viewer', sameTab: o.peer === myId, presence: o.peer === myId ? mine : o.presence || {} })) }); };
         push = (patch) => { if (conn && conn.open) { try { conn.send({ t: 'p', p: patch }); } catch (e) {} } };
@@ -643,7 +667,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
           c.on('close', () => { if (c === conn) { others = []; emit(); } });
         };
         peer.on('open', (id) => { myId = id; finish(api); link(); });
-        peer.on('error', () => { if (!myId) finish(null); else if (!conn || !conn.open) { others = []; emit(); } });
+        peer.on('error', (er) => { if (er && er.type === 'peer-unavailable' && performance.now() - startedAt > 5000) askCode('No game found with the code ' + code + '. Check the code on the big screen.'); if (!myId) finish(null); else if (!conn || !conn.open) { others = []; emit(); } });
         peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
         setInterval(() => { if (!myId) return; if (!conn || !conn.open) link(); else push({ hb: Math.floor(performance.now() / 1500) % 1000 }); }, 1500);
       }
@@ -4519,7 +4543,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
     if (HOSTED && roomTried) { try { history.replaceState(null, '', location.pathname); } catch (e) {} location.reload(); return; }
     chooser.hidden = false;
   });
-  if (HOSTED) $('join-note').textContent = 'Scan with your phone, pick a colour, then press Ready. Room code: ' + ROOM;
+  if (HOSTED) { $('join-note').textContent = 'Scan with your phone, pick a colour, then press Ready. Room code: ' + ROOM; $('room-code').textContent = ROOM; $('room-code').hidden = false; }
   bTune.addEventListener('click', () => { tune.hidden = !tune.hidden; bTune.setAttribute('aria-expanded', String(!tune.hidden)); });
   // Settings: the panel of everything a race does not need at hand
   function moreOpen(on) {
