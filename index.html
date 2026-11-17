@@ -86,13 +86,13 @@ button {
 button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button[aria-pressed="true"] { border-color: var(--accent); }
 #b-start { background: #e7634d; color: #fff; border-color: #e7634d; box-shadow: 0 3px 0 #af525a; }
-/* Settings: a round cog in the bottom right corner; its panel opens just above it */
-#b-more { position: fixed; right: max(18px, env(safe-area-inset-right, 0px)); bottom: max(18px, env(safe-area-inset-bottom, 0px)); z-index: 6;
+/* Settings: a round cog in the top right corner; its panel opens just below it */
+#b-more { position: fixed; right: max(18px, env(safe-area-inset-right, 0px)); top: max(18px, env(safe-area-inset-top, 0px)); z-index: 6;
   width: clamp(48px, 7vmin, 72px) !important; height: clamp(48px, 7vmin, 72px); min-height: 0; padding: 0 !important; border-radius: 50% !important;
   display: grid; place-items: center; color: #2e2338; transition: transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1); }
 #b-more:hover { transform: rotate(40deg); }
 #b-more[aria-expanded="true"] { transform: rotate(90deg); background: #fc5442; color: #fff7dc; }
-.more { position: fixed; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(max(18px, env(safe-area-inset-bottom, 0px)) + clamp(60px, 9vmin, 88px)); z-index: 6;
+.more { position: fixed; right: max(18px, env(safe-area-inset-right, 0px)); top: calc(max(18px, env(safe-area-inset-top, 0px)) + clamp(60px, 9vmin, 88px)); z-index: 6;
   display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; max-width: min(560px, 92vw); box-sizing: border-box;
   background: var(--panel); border: 1px solid var(--panel-line); border-radius: 18px; padding: 10px; pointer-events: auto; }
 .more button { box-shadow: none; background: rgba(255, 252, 235, 0.9); }
