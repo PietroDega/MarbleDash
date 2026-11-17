@@ -624,6 +624,49 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
   }
   // The hosted link. The big screen is the hub: every phone connects to it, sends its own
   // state, and gets back the screen's state plus the slow-changing part of every phone's.
+  // When a phone cannot open a direct link to the big screen (some mobile networks forbid it), the
+  // two talk through a free public message server instead (MQTT over a secure web socket, the same
+  // kind of connection as any web page). Only game messages pass, under the random room code.
+  const MQ_URLS = (() => { const q = new URLSearchParams(location.search).get('mq'); return q ? [q] : ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt']; })();
+  function mqttLink(subTopic, onMsg, onState) {
+    const te = new TextEncoder(), td = new TextDecoder();
+    const str = (x) => { const b = te.encode(x); return [b.length >> 8, b.length & 255, ...b]; };
+    const pkt = (type, body) => { const out = [type], n0 = body.length; let n = n0; do { let d = n % 128; n = Math.floor(n / 128); if (n > 0) d |= 128; out.push(d); } while (n > 0); return new Uint8Array([...out, ...body]); };
+    let ws = null, ok = false, urlI = 0, buf = new Uint8Array(0), ping = 0, closed = false;
+    const id = 'md' + Math.random().toString(36).slice(2, 10);
+    const open = () => {
+      if (closed) return;
+      try { ws = new WebSocket(MQ_URLS[urlI % MQ_URLS.length], 'mqtt'); } catch (e) { urlI++; setTimeout(open, 1500); return; }
+      ws.binaryType = 'arraybuffer';
+      ws.onopen = () => ws.send(pkt(0x10, [...str('MQTT'), 4, 2, 0, 30, ...str(id)]));
+      ws.onmessage = (ev) => {
+        const add = new Uint8Array(ev.data), nb = new Uint8Array(buf.length + add.length); nb.set(buf); nb.set(add, buf.length); buf = nb;
+        for (;;) {
+          if (buf.length < 2) return;
+          let mult = 1, len = 0, i = 1, d;
+          do { if (i >= buf.length) return; d = buf[i++]; len += (d & 127) * mult; mult *= 128; } while (d & 128);
+          if (buf.length < i + len) return;
+          const type = buf[0] >> 4, body = buf.slice(i, i + len); buf = buf.slice(i + len);
+          if (type === 2) {   // connected: listen on our topic, and keep the line alive
+            ok = true; ws.send(pkt(0x82, [0, 1, ...str(subTopic), 0]));
+            clearInterval(ping); ping = setInterval(() => { try { ws.send(new Uint8Array([0xc0, 0])); } catch (e) {} }, 20000);
+            if (onState) onState(true);
+          } else if (type === 3) {
+            const tl = (body[0] << 8) | body[1];
+            try { onMsg(JSON.parse(td.decode(body.slice(2 + tl)))); } catch (e) {}
+          }
+        }
+      };
+      ws.onclose = () => { const was = ok; ok = false; clearInterval(ping); if (onState && was) onState(false); urlI += was ? 0 : 1; if (!closed) setTimeout(open, was ? 500 : 1500); };
+      ws.onerror = () => {};
+    };
+    open();
+    return {
+      send(topic, obj) { if (!ok) return; try { ws.send(pkt(0x30, [...str(topic), ...te.encode(JSON.stringify(obj))])); } catch (e) {} },
+      get ok() { return ok; },
+      close() { closed = true; try { ws.close(); } catch (e) {} },
+    };
+  }
   function hostedRoom(asRole) {
     return new Promise((resolve) => {
       if (typeof Peer === 'undefined') { resolve(null); return; }
@@ -636,7 +679,8 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
         presence(patch) { merge(mine, patch); push(patch); emit(); return Promise.resolve(); },
       };
       if (asRole === 'screen') {
-        const pads = {}; let lastSnap = '';
+        const pads = {}; let lastSnap = '', mq = null;
+        const MQT = 'marbledash-v1/' + ROOM;
         const peer = new Peer(PRE + ROOM);
         emit = () => {
           if (cb) {
@@ -649,9 +693,20 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
           const js = JSON.stringify(out);
           if (js === lastSnap) return;
           lastSnap = js;
-          for (const id in pads) { try { pads[id].conn.send({ t: 's', peers: out }); } catch (e) {} }
+          let viaMq = false;
+          for (const id in pads) { if (pads[id].mq) { viaMq = true; continue; } try { pads[id].conn.send({ t: 's', peers: out }); } catch (e) {} }
+          if (viaMq && mq) mq.send(MQT + '/down', { t: 's', peers: out });   // one message reaches every phone on the message server
         };
-        peer.on('open', (id) => { myId = id; finish(api); emit(); });
+        // the message-server path: phones that could not link directly
+        mq = mqttLink(MQT + '/up', (d) => {
+          if (!d || typeof d.id !== 'string' || d.id.length > 40) return;
+          let pd = pads[d.id];
+          if (!pd) { pd = pads[d.id] = { mq: true, conn: { close() {} }, presence: {}, seen: performance.now() }; lastSnap = ''; }
+          pd.seen = performance.now();
+          if (d.t === 'p' && d.p && typeof d.p === 'object') merge(pd.presence, d.p);
+          if (d.t === 'p' || d.t === 'hi') { if (d.t === 'hi') lastSnap = ''; emit(); }
+        }, (up) => { if (up && !myId) { myId = 'screen-' + ROOM; finish(api); emit(); } });
+        peer.on('open', (id) => { if (!myId) myId = id; finish(api); emit(); });
         peer.on('connection', (conn) => {
           conn.on('open', () => { pads[conn.peer] = { conn, presence: {}, seen: performance.now() }; lastSnap = ''; emit(); });
           conn.on('data', (d) => {
@@ -661,7 +716,7 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
           });
           conn.on('close', () => { delete pads[conn.peer]; emit(); });
         });
-        peer.on('error', () => { if (!myId) finish(null); });
+        peer.on('error', () => {});   // the message server can still carry the game
         peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
         setInterval(() => {   // a phone that has gone silent is dropped
           const now = performance.now(); let gone = false;
@@ -683,34 +738,53 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
           };
         };
         if (!code) { askCode(); return; }
-        // some browsers switch off the direct link the game needs (Lockdown Mode, some privacy settings)
-        if (typeof RTCPeerConnection === 'undefined') { askCode('This browser has switched off the direct link the game needs (Lockdown Mode or a privacy setting). Try a normal Safari or Chrome tab, or another phone.', code); return; }
-        const startedAt = performance.now(); let unknown = false, lastErr = '', step = 'server';
-        // the game was found but the link to it never opened: usually mobile data blocking phone-to-screen links
-        setTimeout(() => {
-          if (conn && conn.open) return;
-          if (unknown) return askCode('No game found with the code ' + code + '. Check the code on the big screen.');
-          // say where it stopped: it helps to tell a blocked network from a blocking browser
-          const where = step === 'server' ? 'could not reach the online meeting point' : step === 'found' ? 'found the game, but the direct link never opened' : 'stopped while linking';
-          askCode('This phone ' + where + '. Try the same Wi-Fi as the big screen, turn off any VPN, Private Relay or Lockdown Mode, or use a normal (not private) tab. [' + step + (lastErr ? ', ' + lastErr : '') + ']', code);
-        }, 12000);
-        const peer = new Peer(); let conn = null, others = [], tried = 0;
+        // First try a direct link to the big screen. If it has not opened within a few seconds (some mobile
+        // networks forbid it, some browsers switch it off), talk through the public message server instead.
+        const MQT = 'marbledash-v1/' + code, startedAt = performance.now();
+        let conn = null, others = [], tried = 0, mq = null, gotSnap = false, lastErr = '', unknown = false;
+        if (!myId) myId = 'pad-' + Math.random().toString(36).slice(2, 10);
         emit = () => { if (cb) cb({ peers: others.map((o) => ({ peer: o.peer, kind: 'viewer', sameTab: o.peer === myId, presence: o.peer === myId ? mine : o.presence || {} })) }); };
-        push = (patch) => { if (conn && conn.open) { try { conn.send({ t: 'p', p: patch }); } catch (e) {} } };
-        const link = () => {
-          if ((conn && conn.open) || performance.now() - tried < 4000) return;
-          tried = performance.now();
-          try { if (conn) conn.close(); } catch (e) {}
-          const c = peer.connect(PRE + code, { reliable: true }); conn = c;
-          c.on('open', () => { step = 'linked'; try { c.send({ t: 'p', p: mine }); } catch (e) {} });
-          c.on('error', (er) => { lastErr = (er && (er.type || er.message)) || 'link error'; });
-          c.on('data', (d) => { if (c === conn && d && d.t === 's' && Array.isArray(d.peers)) { others = d.peers; emit(); } });
-          c.on('close', () => { if (c === conn) { others = []; emit(); } });
+        const direct = () => conn && conn.open;
+        push = (patch) => {
+          if (direct()) { try { conn.send({ t: 'p', p: patch }); } catch (e) {} }
+          else if (mq && mq.ok) mq.send(MQT + '/up', { id: myId, t: 'p', p: patch });
         };
-        peer.on('open', (id) => { myId = id; step = 'found'; finish(api); link(); });
-        peer.on('error', (er) => { if (er) lastErr = er.type || String(er.message || er).slice(0, 40); if (er && er.type === 'peer-unavailable') unknown = true; if (er && er.type === 'peer-unavailable' && performance.now() - startedAt > 5000) askCode('No game found with the code ' + code + '. Check the code on the big screen.'); if (!myId) finish(null); else if (!conn || !conn.open) { others = []; emit(); } });
-        peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
-        setInterval(() => { if (!myId) return; if (!conn || !conn.open) link(); else push({ hb: Math.floor(performance.now() / 1500) % 1000 }); }, 1500);
+        const useServer = () => {
+          if (mq || direct()) return;
+          mq = mqttLink(MQT + '/down', (d) => { if (d && d.t === 's' && Array.isArray(d.peers)) { gotSnap = true; others = d.peers; emit(); } }, (up) => {
+            if (!up) return;
+            mq.send(MQT + '/up', { id: myId, t: 'hi' }); mq.send(MQT + '/up', { id: myId, t: 'p', p: mine });
+            finish(api); emit();
+          });
+        };
+        // if nothing answers either way, say so, and say which way it got stuck
+        setTimeout(() => {
+          if (direct() || gotSnap) return;
+          if (unknown) return askCode('No game found with the code ' + code + '. Check the code on the big screen.');
+          askCode(mq && mq.ok ? 'No game is answering with the code ' + code + '. Check the code on the big screen, and that the big screen is on the latest version.'
+            : 'This phone could not reach the game. Check the phone has internet, then try again.' + (lastErr ? ' [' + lastErr + ']' : ''), code);
+        }, 16000);
+        let peer = null;
+        if (typeof RTCPeerConnection === 'undefined' || typeof Peer === 'undefined') useServer();   // direct links switched off here
+        else {
+          peer = new Peer();
+          const link = () => {
+            if (mq || direct() || performance.now() - tried < 4000) return;
+            tried = performance.now();
+            try { if (conn) conn.close(); } catch (e) {}
+            const c = peer.connect(PRE + code, { reliable: true }); conn = c;
+            c.on('open', () => { try { c.send({ t: 'p', p: mine }); } catch (e) {} });
+            c.on('error', (er) => { lastErr = (er && (er.type || er.message)) || 'link error'; });
+            c.on('data', (d) => { if (c === conn && d && d.t === 's' && Array.isArray(d.peers)) { gotSnap = true; others = d.peers; emit(); } });
+            c.on('close', () => { if (c === conn) { others = []; emit(); } });
+          };
+          peer.on('open', (id) => { if (!mq) myId = id; finish(api); link(); });
+          peer.on('error', (er) => { if (er) lastErr = er.type || String(er.message || er).slice(0, 40); if (er && er.type === 'peer-unavailable') unknown = true; if (!peer.open) useServer(); });
+          peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
+          setTimeout(() => { if (!direct()) useServer(); }, 5500);   // the direct link did not open in time
+          setInterval(() => { if (peer.open && !mq && !direct()) link(); }, 1500);
+        }
+        setInterval(() => { if (direct() || (mq && mq.ok)) push({ hb: Math.floor(performance.now() / 1500) % 1000 }); }, 1500);
       }
       setTimeout(() => finish(null), 15000);
     });
