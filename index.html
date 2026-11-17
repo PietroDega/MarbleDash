@@ -683,12 +683,16 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
           };
         };
         if (!code) { askCode(); return; }
-        const startedAt = performance.now(); let unknown = false;
+        // some browsers switch off the direct link the game needs (Lockdown Mode, some privacy settings)
+        if (typeof RTCPeerConnection === 'undefined') { askCode('This browser has switched off the direct link the game needs (Lockdown Mode or a privacy setting). Try a normal Safari or Chrome tab, or another phone.', code); return; }
+        const startedAt = performance.now(); let unknown = false, lastErr = '', step = 'server';
         // the game was found but the link to it never opened: usually mobile data blocking phone-to-screen links
         setTimeout(() => {
           if (conn && conn.open) return;
           if (unknown) return askCode('No game found with the code ' + code + '. Check the code on the big screen.');
-          askCode('Found the game, but this phone can\u2019t reach it. Mobile data often blocks this: join the same Wi-Fi as the big screen, then try again.', code);
+          // say where it stopped: it helps to tell a blocked network from a blocking browser
+          const where = step === 'server' ? 'could not reach the online meeting point' : step === 'found' ? 'found the game, but the direct link never opened' : 'stopped while linking';
+          askCode('This phone ' + where + '. Try the same Wi-Fi as the big screen, turn off any VPN, Private Relay or Lockdown Mode, or use a normal (not private) tab. [' + step + (lastErr ? ', ' + lastErr : '') + ']', code);
         }, 12000);
         const peer = new Peer(); let conn = null, others = [], tried = 0;
         emit = () => { if (cb) cb({ peers: others.map((o) => ({ peer: o.peer, kind: 'viewer', sameTab: o.peer === myId, presence: o.peer === myId ? mine : o.presence || {} })) }); };
@@ -698,12 +702,13 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--accent); }
           tried = performance.now();
           try { if (conn) conn.close(); } catch (e) {}
           const c = peer.connect(PRE + code, { reliable: true }); conn = c;
-          c.on('open', () => { try { c.send({ t: 'p', p: mine }); } catch (e) {} });
+          c.on('open', () => { step = 'linked'; try { c.send({ t: 'p', p: mine }); } catch (e) {} });
+          c.on('error', (er) => { lastErr = (er && (er.type || er.message)) || 'link error'; });
           c.on('data', (d) => { if (c === conn && d && d.t === 's' && Array.isArray(d.peers)) { others = d.peers; emit(); } });
           c.on('close', () => { if (c === conn) { others = []; emit(); } });
         };
-        peer.on('open', (id) => { myId = id; finish(api); link(); });
-        peer.on('error', (er) => { if (er && er.type === 'peer-unavailable') unknown = true; if (er && er.type === 'peer-unavailable' && performance.now() - startedAt > 5000) askCode('No game found with the code ' + code + '. Check the code on the big screen.'); if (!myId) finish(null); else if (!conn || !conn.open) { others = []; emit(); } });
+        peer.on('open', (id) => { myId = id; step = 'found'; finish(api); link(); });
+        peer.on('error', (er) => { if (er) lastErr = er.type || String(er.message || er).slice(0, 40); if (er && er.type === 'peer-unavailable') unknown = true; if (er && er.type === 'peer-unavailable' && performance.now() - startedAt > 5000) askCode('No game found with the code ' + code + '. Check the code on the big screen.'); if (!myId) finish(null); else if (!conn || !conn.open) { others = []; emit(); } });
         peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
         setInterval(() => { if (!myId) return; if (!conn || !conn.open) link(); else push({ hb: Math.floor(performance.now() / 1500) % 1000 }); }, 1500);
       }
